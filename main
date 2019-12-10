@@ -1,0 +1,163 @@
+import sc2
+from sc2 import run_game, maps, Race, Difficulty
+from sc2.player import Bot, Computer
+from sc2.constants import NEXUS, PROBE, PYLON, ASSIMILATOR, GATEWAY, \
+    CYBERNETICSCORE, STALKER, STARGATE, VOIDRAY, FORGE, ZEALOT, TWILIGHTCOUNCIL, ROBOTICSFACILITY, IMMORTAL, \
+    PROTOSSAIRWEAPONSLEVEL1, PHOTONCANNON, PROTOSSAIRWEAPONSLEVEL2, PROTOSSAIRWEAPONSLEVEL3
+import random
+from random import randint
+
+
+class SentdeBot(sc2.BotAI):
+    def __init__(self):
+        self.ITERATIONS_PER_MINUTE = 165
+        self.MAX_WORKERS = 75
+
+    async def on_step(self, iteration):
+        self.iteration = iteration
+        await self.distribute_workers()
+        await self.build_workers()
+        await self.build_pylons()
+        await self.build_assimilators()
+        await self.expand()
+        await self.offensive_force_buildings()
+        await self.build_offensive_force()
+        await self.attack()
+    # Building workers
+    async def build_workers(self):
+        if (len(self.units(NEXUS)) * 16) > len(self.units(PROBE)) and len(self.units(PROBE)) < self.MAX_WORKERS:
+            for nexus in self.units(NEXUS).ready.idle:
+                if self.can_afford(PROBE):
+                    await self.do(nexus.train(PROBE))
+    # Building pylons for power
+    
+    async def build_pylons(self):
+        if self.supply_left < 5 and not self.already_pending(PYLON):
+            nexuses = self.units(NEXUS).ready
+            if nexuses.exists:
+                if self.can_afford(PYLON):
+                    await self.build(PYLON, near=nexuses.first)
+    # Bulinding assimilators for each vespene
+    async def build_assimilators(self):
+        for nexus in self.units(NEXUS).ready:
+            vaspenes = self.state.vespene_geyser.closer_than(15.0, nexus)
+            for vaspene in vaspenes:
+                if not self.can_afford(ASSIMILATOR):
+                    break
+                worker = self.select_build_worker(vaspene.position)
+                if worker is None:
+                    break
+                if not self.units(ASSIMILATOR).closer_than(1.0, vaspene).exists:
+                    await self.do(worker.build(ASSIMILATOR, vaspene))
+    # Expanding according to time
+    async def expand(self):
+        if self.units(NEXUS).amount < (self.iteration / self.ITERATIONS_PER_MINUTE) and self.can_afford(NEXUS):
+            await self.expand_now()
+    # Building offensive buildings
+    async def offensive_force_buildings(self):
+        if self.units(PYLON).ready.exists:
+            pylon = self.units(PYLON).ready.random
+            # Upgrading air forces
+            for air in self.units(CYBERNETICSCORE).ready.idle:
+                if self.can_afford(PROTOSSAIRWEAPONSLEVEL1) and self.supply_left > 0 and not self.already_pending_upgrade(PROTOSSAIRWEAPONSLEVEL1):
+                    print("air")
+                    await self.do(air.research(PROTOSSAIRWEAPONSLEVEL1))
+
+#            for air in self.units(CYBERNETICSCORE).ready.idle:
+#                if self.can_afford(PROTOSSAIRWEAPONSLEVEL2) and self.supply_left > 0 and not self.already_pending_upgrade(PROTOSSAIRWEAPONSLEVEL2):
+#                    print("air")
+#                    await self.do(air.research(PROTOSSAIRWEAPONSLEVEL2))
+#
+#            for air in self.units(CYBERNETICSCORE).ready.idle:
+#                if self.can_afford(PROTOSSAIRWEAPONSLEVEL3) and self.supply_left > 0 and not self.already_pending_upgrade(PROTOSSAIRWEAPONSLEVEL3):
+#                    print("air")
+#                    await self.do(air.research(PROTOSSAIRWEAPONSLEVEL3))
+#            # Construction of photocannons
+            if self.units(ROBOTICSFACILITY).ready.idle:
+                if self.can_afford(PHOTONCANNON) and not self.already_pending(PHOTONCANNON):
+                    if (len(self.units(NEXUS)) * 10) > len(self.units(PHOTONCANNON)):
+                        await self.build(PHOTONCANNON, near=pylon)
+             # Construction of gateways
+            if len(self.units(GATEWAY)) < self.units(NEXUS).amount:
+                if self.can_afford(GATEWAY) and not self.already_pending(GATEWAY):
+                    await self.build(GATEWAY, near=pylon)
+            # Construcion of one forge
+            if self.units(NEXUS).ready.exists and not self.units(FORGE):
+                if self.can_afford(FORGE) and not self.already_pending(FORGE):
+                    await self.build(FORGE, near=pylon)
+            # Construction of Cybernatics core
+            if self.units(GATEWAY).ready.exists and not self.units(CYBERNETICSCORE):
+                if self.can_afford(CYBERNETICSCORE) and not self.already_pending(CYBERNETICSCORE) and len(self.units(CYBERNETICSCORE)) < len(self.units(NEXUS)):
+                    await self.build(CYBERNETICSCORE, near=pylon)
+            # Construction of Stargate
+            if self.units(CYBERNETICSCORE).ready.exists:
+                if len(self.units(STARGATE)) < 1:
+                    if self.can_afford(STARGATE) and not self.already_pending(STARGATE):
+                        await self.build(STARGATE, near=pylon)
+            # Construction of Robotics facility
+            if self.units(CYBERNETICSCORE).ready.exists:
+                if len(self.units(ROBOTICSFACILITY)) < 1:
+                    if self.can_afford(ROBOTICSFACILITY) and not self.already_pending(ROBOTICSFACILITY):
+                        await self.build(ROBOTICSFACILITY, near=pylon)
+
+    async def build_offensive_force(self):
+        # Construction of Voidrays
+        for sg in self.units(STARGATE).ready.idle:
+            if self.can_afford(VOIDRAY) and (len(self.units(NEXUS)) * 5) > len(self.units(VOIDRAY)):
+                await self.do(sg.train(VOIDRAY))
+
+#        for ZL in self.units(GATEWAY).ready.idle:
+#            if not self.units(ZEALOT).amount > self.units(VOIDRAY).amount and self.can_afford(ZEALOT) and (len(self.units(NEXUS)) * 10) > len(self.units(ZEALOT)):
+#                await self.do(ZL.train(ZEALOT))
+#       # Construction of Immortals
+        for IM in self.units(ROBOTICSFACILITY).ready.idle:
+            if self.can_afford(IMMORTAL) and (len(self.units(NEXUS)) * 5) > len(self.units(IMMORTAL)):
+                await self.do(IM.train(IMMORTAL))
+
+     # Finding targets to attack enemies
+    def find_target(self, state):
+        if len(self.known_enemy_units) > 0:
+            return random.choice(self.known_enemy_units)
+        elif len(self.known_enemy_structures) > 0:
+            return random.choice(self.known_enemy_structures)
+        else:
+            return self.enemy_start_locations[0]
+
+    # attacking the enemies base and defending our main base
+    async def attack(self):
+        # {UNIT: [n to fight, n to defend]}
+        if (len(self.units(VOIDRAY)) + len(self.units(IMMORTAL)) > 20):
+            aggressive_units = {VOIDRAY: [0, len(self.units(VOIDRAY))],
+                                IMMORTAL: [0, len(self.units(IMMORTAL))]
+                                }
+
+            for UNIT in aggressive_units:
+                if self.units(UNIT).amount > aggressive_units[UNIT][0] and self.units(UNIT).amount > aggressive_units[UNIT][1]:
+                    for s in self.units(UNIT).idle:
+                        await self.do(s.attack(self.find_target(self.state)))
+
+                elif self.units(UNIT).amount > aggressive_units[UNIT][1]:
+                    if len(self.known_enemy_units) > 0:
+                        for s in self.units(UNIT).idle:
+                            await self.do(s.attack(random.choice(self.known_enemy_units)))
+
+        else:
+            aggressive_units = {VOIDRAY: [len(self.units(VOIDRAY)), 0],
+                                IMMORTAL: [len(self.units(IMMORTAL)), 0]
+                                }
+
+            for UNIT in aggressive_units:
+                if self.units(UNIT).amount > aggressive_units[UNIT][0] and self.units(UNIT).amount > aggressive_units[UNIT][1]:
+                    for s in self.units(UNIT).idle:
+                        await self.do(s.attack(self.find_target(self.state)))
+
+                elif self.units(UNIT).amount > aggressive_units[UNIT][1]:
+                    if len(self.known_enemy_units) > 0:
+                        for s in self.units(UNIT).idle:
+                            await self.do(s.attack(random.choice(self.known_enemy_units)))
+
+# running main game
+run_game(maps.get("Flat128"), [
+    Bot(Race.Protoss, SentdeBot()),
+    Computer(Race.Terran, Difficulty.Medium)
+    ], realtime=False)
