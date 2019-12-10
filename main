@@ -63,17 +63,9 @@ class SentdeBot(sc2.BotAI):
                     print("air")
                     await self.do(air.research(PROTOSSAIRWEAPONSLEVEL1))
 
-#            for air in self.units(CYBERNETICSCORE).ready.idle:
-#                if self.can_afford(PROTOSSAIRWEAPONSLEVEL2) and self.supply_left > 0 and not self.already_pending_upgrade(PROTOSSAIRWEAPONSLEVEL2):
-#                    print("air")
-#                    await self.do(air.research(PROTOSSAIRWEAPONSLEVEL2))
-#
-#            for air in self.units(CYBERNETICSCORE).ready.idle:
-#                if self.can_afford(PROTOSSAIRWEAPONSLEVEL3) and self.supply_left > 0 and not self.already_pending_upgrade(PROTOSSAIRWEAPONSLEVEL3):
-#                    print("air")
-#                    await self.do(air.research(PROTOSSAIRWEAPONSLEVEL3))
+                   await self.do(air.research(PROTOSSAIRWEAPONSLEVEL3))
 #            # Construction of photocannons
-            if self.units(ROBOTICSFACILITY).ready.idle:
+            if self.units(FORGE).ready.idle:
                 if self.can_afford(PHOTONCANNON) and not self.already_pending(PHOTONCANNON):
                     if (len(self.units(NEXUS)) * 10) > len(self.units(PHOTONCANNON)):
                         await self.build(PHOTONCANNON, near=pylon)
